@@ -520,7 +520,7 @@ export default class {
         }
 
         // Get audio format from available formats
-        const audioFormats = video.chooseFormat({quality: 'lowaudio'});
+        const audioFormats = video.chooseFormat({type: 'video+audio'});
         if (!audioFormats || !audioFormats.url) {
           throw new Error('No audio format available for this video');
         }
