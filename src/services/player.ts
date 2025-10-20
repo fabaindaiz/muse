@@ -1,7 +1,7 @@
 import {VoiceChannel, Snowflake} from 'discord.js';
 import {Readable} from 'stream';
 import {hash} from 'hasha';
-import ytdl, {videoFormat} from '@distube/ytdl-core';
+import {Innertube} from 'youtubei.js';
 import {WriteStream} from 'fs-capacitor';
 import ffmpeg from 'fluent-ffmpeg';
 import shuffle from 'array-shuffle';
@@ -57,8 +57,6 @@ export enum STATUS {
 export interface PlayerEvents {
   statusChange: (oldStatus: STATUS, newStatus: STATUS) => void;
 }
-
-type YTDLVideoFormat = videoFormat & {loudnessDb?: number};
 
 export const DEFAULT_VOLUME = 100;
 
@@ -505,74 +503,51 @@ export default class {
       return this.createReadStream({url: song.url, cacheKey: song.url});
     }
 
-    let ffmpegInput: string | null;
+    let ffmpegInput: string | null = null;
     const ffmpegInputOptions: string[] = [];
     let shouldCacheVideo = false;
-
-    let format: YTDLVideoFormat | undefined;
 
     ffmpegInput = await this.fileCache.getPathFor(await this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
-      // Not yet cached, must download
-      const info = await ytdl.getInfo(song.url);
+      // Not yet cached, must download using youtubei.js
+      try {
+        const yt = await Innertube.create();
+        const video = await yt.getInfo(song.url);
 
-      const formats = info.formats as YTDLVideoFormat[];
-
-      const filter = (format: ytdl.videoFormat): boolean => format.codecs === 'opus' && format.container === 'webm' && format.audioSampleRate !== undefined && parseInt(format.audioSampleRate, 10) === 48000;
-
-      format = formats.find(filter);
-
-      const nextBestFormat = (formats: ytdl.videoFormat[]): ytdl.videoFormat | undefined => {
-        if (formats.length < 1) {
-          return undefined;
+        if (!video) {
+          throw new Error('Could not get video info from YouTube');
         }
 
-        if (formats[0].isLive) {
-          formats = formats.sort((a, b) => (b as unknown as {audioBitrate: number}).audioBitrate - (a as unknown as {audioBitrate: number}).audioBitrate); // Bad typings
-
-          return formats.find(format => [128, 127, 120, 96, 95, 94, 93].includes(parseInt(format.itag as unknown as string, 10))); // Bad typings
+        // Get audio format from available formats
+        const audioFormats = video.chooseFormat({quality: 'lowaudio'});
+        if (!audioFormats || !audioFormats.url) {
+          throw new Error('No audio format available for this video');
         }
 
-        formats = formats
-          .filter(format => format.averageBitrate)
-          .sort((a, b) => {
-            if (a && b) {
-              return b.averageBitrate! - a.averageBitrate!;
-            }
+        ffmpegInput = audioFormats.url;
 
-            return 0;
-          });
-        return formats.find(format => !format.bitrate) ?? formats[0];
-      };
+        const isLive = video.basic_info?.is_live ?? false;
+        const lengthSeconds = video.basic_info?.duration ?? 0;
 
-      if (!format) {
-        format = nextBestFormat(info.formats);
+        // Don't cache livestreams or long videos
+        const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
+        shouldCacheVideo = !isLive && lengthSeconds < MAX_CACHE_LENGTH_SECONDS && !options.seek;
 
-        if (!format) {
-          // If still no format is found, throw
-          throw new Error('Can\'t find suitable format.');
-        }
+        debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
+
+        ffmpegInputOptions.push(...[
+          '-reconnect',
+          '1',
+          '-reconnect_streamed',
+          '1',
+          '-reconnect_delay_max',
+          '5',
+        ]);
+      } catch (error) {
+        debug('youtubei.js error:', error);
+        throw new Error(`Failed to get stream from YouTube: ${(error as Error).message}`);
       }
-
-      debug('Using format', format);
-
-      ffmpegInput = format.url;
-
-      // Don't cache livestreams or long videos
-      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
-      shouldCacheVideo = !info.player_response.videoDetails.isLiveContent && parseInt(info.videoDetails.lengthSeconds, 10) < MAX_CACHE_LENGTH_SECONDS && !options.seek;
-
-      debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
-
-      ffmpegInputOptions.push(...[
-        '-reconnect',
-        '1',
-        '-reconnect_streamed',
-        '1',
-        '-reconnect_delay_max',
-        '5',
-      ]);
     }
 
     if (options.seek) {
@@ -584,11 +559,10 @@ export default class {
     }
 
     return this.createReadStream({
-      url: ffmpegInput,
+      url: ffmpegInput!,
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
-      volumeAdjustment: format?.loudnessDb ? `${-format.loudnessDb}dB` : undefined,
     });
   }
 
