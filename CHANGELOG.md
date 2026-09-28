@@ -6,6 +6,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.8] - 2026-09-20
+
+- Retry stalled initial voice handshakes within a bounded wait, share concurrent joins, and report the failed network phase without exposing voice credentials.
+- Connect before queueing new requests so failed voice joins do not leave unexpected tracks behind.
+- Handle Discord audio resource errors without crashing Muse and continue normal queue advancement.
+- Keep chapter and SponsorBlock cache boundaries separate so short cached excerpts cannot truncate full tracks. Existing audio caches refill as needed.
+- Apply SponsorBlock trimming within each chapter's original timestamps so split tracks play the correct audio.
+- Ignore stale listener-departure events after the voice connection or channel changes.
+- Prevent early YouTube playlist metadata failures from becoming unhandled rejections while later pages load.
+- Refresh expired metadata without racing concurrent requests to delete the same cache row.
+- Validate PR snapshot provenance before granting publishing access and restrict snapshot tags to the corresponding PR preview.
+- Resolve SoundCloud tracks, share links, and bounded playlists with yt-dlp instead of probing HTML pages as audio streams, and refresh media URLs when playback begins.
+
+## [2.11.7] - 2026-08-20
+
+- Detect FFmpeg failures before reporting playback as started, skip failed queued tracks instead of wedging the player, and retain bounded failure details in the container log.
+- Log failed Discord interactions with command and guild context so playback incidents can be diagnosed after the fact.
+
+## [2.11.6] - 2026-07-12
+
+- Add optional age-verified YouTube cookie-file support for age-restricted playback.
+- Fall back once to a closely matched audio-focused upload when a music video is age-restricted.
+- Prevent unavailable YouTube tracks and rejected automatic queue advances from restarting Muse.
+- Install current yt-dlp JavaScript challenge support and use the bundled Node.js runtime.
+- Fix provider routing and autocomplete allocation, playlist limits and pagination, and YouTube chapter parsing.
+- Fix queue command boundaries, queue insertion, and concurrent Player playback and voice-recovery transitions.
+- Correct SponsorBlock trimming and restore pre-duck volume after overlapping speakers finish.
+- Make cache writes safe under concurrent downloads, reconcile every indexed row, and reject negative cache limits.
+- Reject blank required credentials and honor explicit SQLite database paths during legacy migrations.
+- Add a Node.js behavior suite for commands, providers, queueing, playback, and caching.
+
+## [2.11.5] - 2026-06-04
+
+- Fix queue-empty crashes when auto-announce is enabled or playback ends without a next song.
+- Fix Spotify autocomplete and token refresh failures so Spotify API errors do not terminate the bot.
+- Harden release, PR snapshot, and `yt-dlp` refresh workflow maintenance.
+
+## [2.11.4] - 2026-04-26
+- Add optional `YT_DLP_AUTO_UPDATE` startup refresh support and startup `YT_DLP_VERSION` logging.
+- Add scheduled, manual, and release-triggered GHCR image refreshes for the latest `yt-dlp`.
+- Improve Docker `yt-dlp` path handling so bundled installs remain overrideable and updateable.
+- Restore PR snapshot image comments and artifact paths.
+- Refresh GitHub Actions runtimes.
+
+## [2.11.3] - 2026-04-24
+- Improve YouTube format fetching fallback by retrying with both watch URL and video ID inputs.
+- Improve YouTube playback reliability by resolving playable media URLs with `yt-dlp`.
+- Include `yt-dlp` in the Docker image and document `YT_DLP_PATH` for direct Node.js installs.
+- Improve Discord voice connection reliability by waiting for the voice connection to become ready before playback.
+- Upgrade `@discordjs/voice` to pick up current Discord voice transport support.
+- Avoid disconnecting during voice connection handshakes when guild voice state updates arrive.
+
+## [2.11.2] - 2026-03-29
+- Improve YouTube playback reliability by updating ytdl-core and normalizing getInfo input
+
 ## [2.11.1] - 2025-04-07
 - Revert Dockerfile to inherit dependencies image from base image
 
@@ -367,7 +422,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[unreleased]: https://github.com/museofficial/muse/compare/v2.11.1...HEAD
+[unreleased]: https://github.com/museofficial/muse/compare/v2.11.7...HEAD
+[2.11.8]: https://github.com/museofficial/muse/compare/v2.11.7...v2.11.8
+[2.11.7]: https://github.com/museofficial/muse/compare/v2.11.6...v2.11.7
+[2.11.6]: https://github.com/museofficial/muse/compare/v2.11.5...v2.11.6
+[2.11.5]: https://github.com/museofficial/muse/compare/v2.11.4...v2.11.5
+[2.11.4]: https://github.com/museofficial/muse/compare/v2.11.3...v2.11.4
+[2.11.3]: https://github.com/museofficial/muse/compare/v2.11.2...v2.11.3
+[2.11.2]: https://github.com/museofficial/muse/compare/v2.11.1...v2.11.2
 [2.11.1]: https://github.com/museofficial/muse/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/museofficial/muse/compare/v2.10.1...v2.11.0
 [2.10.1]: https://github.com/museofficial/muse/compare/v2.10.0...v2.10.1
